@@ -1,0 +1,159 @@
+timedatectl
+
+sudo dpkg-reconfigure tzdata
+
+sudo /etc/init.d/cron restart
+
+sudo apt-get update
+
+sudo apt-get upgrade
+
+timedatectl
+
+sudo apt-get install python3-pip
+
+apt install python3.11-venv
+
+sudo apt-get install git
+
+git clone https://github.com/henriquejhas/armacoesAtacado.git
+
+cd armacoesAtacado
+
+python3 -m venv venv
+
+source venv/bin/activate
+
+pip install -r requirements.txt
+
+dentro do arquivo mian.py{app.run(debug=True, host='0.0.0.0')}
+
+### criar o socket ###
+
+sudo nano /etc/systemd/system/app.socket
+
+[Unit]
+Description=app socket
+
+[Socket]
+ListenStream=/run/app.sock
+
+[Install]
+WantedBy=sockets.target
+
+### criar um service ###
+
+sudo nano /etc/systemd/system/app.service
+
+[Unit]
+Description=app daemon
+Requires=app.socket
+After=network.target
+
+[Service]
+User=hjhas92
+Group=www-data
+WorkingDirectory=/home/hjhas92/armacoesAtacado
+ExecStart=/home/hjhas92/armacoesAtacado/venv/bin/gunicorn \
+          --access-logfile - \
+          --workers 3 \
+          --bind unix:/run/app.sock \
+          wsgi:app
+
+[Install]
+WantedBy=multi-user.target
+
+pip install gunicorn
+
+sudo systemctl start app.socket
+sudo systemctl enable app.socket
+sudo systemctl status app.socket
+
+sudo systemctl start app.service
+sudo systemctl enable app.service
+sudo systemctl status app.service
+
+sudo apt install nginx -y
+
+### Instalando o snap no Debian ###
+
+sudo apt update
+sudo apt install snapd
+
+Efetue logout e login 
+
+sudo snap install snapd
+
+### instalar o cerbot ###
+
+sudo snap install --classic certbot
+sudo ln -s /snap/bin/certbot /usr/bin/certbot
+sudo certbot --nginx
+sudo certbot renew --dry-run
+
+no arquivo main.py{
+	context = ('/etc/letsencrypt/live/www.armacaoatacado.com/fullchain.pem', '/etc/letsencrypt/live/www.armacaoatacado.com/privkey.pem')
+    	app.run(ssl_context=context, host='0.0.0.0')
+
+}
+
+arquivo /etc/nginx/sites-enabled/default{
+
+server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+
+        root /var/www/html;
+
+        index index.html index.htm index.nginx-debian.html;
+
+        server_name _;
+
+        location / {
+                include proxy_params;
+                proxy_pass http://unix:/run/app.sock;
+        }
+
+}
+server {
+
+        root /var/www/html;
+
+        index index.html index.htm index.nginx-debian.html;
+    server_name www.armacaoatacado.com; # managed by Certbot
+
+
+        location / {
+                include proxy_params;
+                proxy_pass http://unix:/run/app.sock;
+        }
+
+    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/www.armacaoatacado.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/www.armacaoatacado.com/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+server {
+    if ($host = www.armacaoatacado.com) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+
+        listen 80 ;
+        listen [::]:80 ;
+    server_name www.armacaoatacado.com;
+    return 404; # managed by Certbot
+
+
+}
+
+}
+
+sudo systemctl restart app.service
+sudo systemctl restart nginx
+
+### site na nuvem com SSL!!! ###
+
